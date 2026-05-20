@@ -31,11 +31,11 @@ val.pet.fido.purr; // error — purr doesn't exist on dog
 
 - **Unmentioned fields** pass through unchanged
 - **Literal narrowing** — `Refine<{ a: string }, { a: 'hello' }>` narrows `a` to `'hello'`
-- **Union narrowing** — if the base field is a union, the constraint picks the matching member
+- **Nested intersection** — non-union object fields are intersected, preserving base fields not in the constraint
+- **Union narrowing** — use `Record<string, Union>` to narrow union members by discriminant
 - **Record key preservation** — `Record<string, ...>` constraints refine values while keeping the original keys
 - **Array refinement** — array element types are refined individually
 - **Function narrowing** — refine parameter types and return types
-- **Replacement** — when no union member matches, the constraint replaces the base type entirely
 
 ## License
 

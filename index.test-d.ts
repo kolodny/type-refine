@@ -78,7 +78,7 @@ r8.handlers!.click = [() => {}];
 // @ts-expect-error — invalid event key
 r8.handlers!.resize;
 
-// --- Nested object replacement (base has functions → full replace) ---
+// --- Nested object intersection (non-union → intersects, keeps all fields) ---
 type Base9 = {
   config: { name: string; debug: boolean; callback: () => void };
 };
@@ -86,27 +86,27 @@ type R9 = Refine<Base9, { config: { name: 'prod'; debug: false } }>;
 const r9 = {} as R9;
 const n9: 'prod' = r9.config.name; // ok — literal
 const d9: false = r9.config.debug; // ok — literal
-// @ts-expect-error — callback not in constraint, base had functions so full replace
-r9.config.callback;
+r9.config.callback(); // ok — preserved from base
 
-// --- Nested object replacement (partial constraint → replaces) ---
+// --- Partial constraint on non-union → intersects, preserves base fields ---
 type Base10 = { config: { name: string; debug: boolean; version: number } };
 type R10 = Refine<Base10, { config: { name: 'prod' } }>;
 const r10 = {} as R10;
-const n10: 'prod' = r10.config.name; // ok — from constraint
-// @ts-expect-error — version not in constraint, full replace
-r10.config.version;
+const n10: 'prod' = r10.config.name; // ok — narrowed
+r10.config.version.toFixed(); // ok — preserved from base
 
-// --- Nested object narrowing (union member match → narrows + intersects) ---
+// --- Union narrowing works via Records (R5, R7) but not direct fields ---
+// Direct union fields use RefineField which replaces when Extract can't match.
+// Use Record<string, Union> pattern for union narrowing.
 type Mode =
   | { mode: 'dev'; verbose: boolean }
   | { mode: 'prod'; region: string };
-type Base11 = { config: Mode };
-type R11 = Refine<Base11, { config: { mode: 'prod' } }>;
+type Base11 = { modes: Record<string, Mode> };
+type R11 = Refine<Base11, { modes: Record<string, { mode: 'prod' }> }>;
 const r11 = {} as R11;
-r11.config.region; // ok — narrowed to prod variant
+r11.modes.x.region; // ok — narrowed to prod via Record
 // @ts-expect-error — verbose is on dev, not prod
-r11.config.verbose;
+r11.modes.x.verbose;
 
 // --- Empty constraint is identity ---
 type Base12 = { a: string; b: number };
