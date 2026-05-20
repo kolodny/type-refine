@@ -10,10 +10,15 @@ type RefineDeep<Base, Constraint> = [Constraint] extends [Array<infer CE>]
     : RefineField<Base, Constraint>
   : RefineField<Base, Constraint>;
 
-export type Refine<
-  Base,
-  Constraint extends Partial<Record<keyof Base & string, any>>,
-> = {
+type RefineConstraint<T> = Partial<{
+  [K in keyof T & string]: [NonNullable<T[K]>] extends [any[]]
+    ? any
+    : [NonNullable<T[K]>] extends [Record<string, any>]
+      ? RefineConstraint<NonNullable<T[K]>>
+      : any;
+}>;
+
+export type Refine<Base, Constraint extends RefineConstraint<Base>> = {
   [K in keyof Base]: K extends keyof Constraint
     ? [NonNullable<Base[K]>] extends [Record<string, infer V>]
       ? [Constraint[K]] extends [Record<string, infer C>]
@@ -24,4 +29,3 @@ export type Refine<
       : RefineDeep<Base[K], Constraint[K]>
     : Base[K];
 };
-
