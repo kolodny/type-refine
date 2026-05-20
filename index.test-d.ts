@@ -1,4 +1,4 @@
-import type Refine from './index';
+import type { Refine } from './index';
 
 type Assert<T extends true> = T;
 type Eq<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;

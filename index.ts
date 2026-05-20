@@ -10,7 +10,7 @@ type RefineDeep<Base, Constraint> = [Constraint] extends [Array<infer CE>]
     : RefineField<Base, Constraint>
   : RefineField<Base, Constraint>;
 
-type Refine<
+export type Refine<
   Base,
   Constraint extends Partial<Record<keyof Base & string, any>>,
 > = {
@@ -25,4 +25,3 @@ type Refine<
     : Base[K];
 };
 
-export type { Refine as default };

@@ -14,7 +14,7 @@ npm install type-refine
 ## Usage
 
 ```ts
-import type Refine from 'type-refine';
+import type { Refine } from 'type-refine';
 
 type Animal = { type: 'dog'; bark: boolean } | { type: 'cat'; purr: boolean };
 type Base = { pet: Record<string, Animal> };
