@@ -1,0 +1,38 @@
+{
+  "name": "type-refine",
+  "version": "0.0.0",
+  "description": "A utility type for refining and narrowing TypeScript types",
+  "types": "index.ts",
+  "exports": {
+    ".": {
+      "types": "./index.ts"
+    }
+  },
+  "files": [
+    "index.ts"
+  ],
+  "scripts": {
+    "test": "tsc",
+    "prepublishOnly": "npm test"
+  },
+  "keywords": [
+    "typescript",
+    "types",
+    "utility-types",
+    "refine",
+    "narrow"
+  ],
+  "author": "Moshe Kolodny",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kolodny/type-refine.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kolodny/type-refine/issues"
+  },
+  "homepage": "https://github.com/kolodny/type-refine#readme",
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}

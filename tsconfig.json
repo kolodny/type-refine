@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "target": "ESNext",
+    "moduleResolution": "bundler"
+  },
+  "include": ["index.ts", "index.test-d.ts"]
+}
