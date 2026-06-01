@@ -1,4 +1,4 @@
-import type { Refine } from './index';
+import type { Refine, Override, Loose } from './index';
 
 type Assert<T extends true> = T;
 type Eq<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
@@ -29,7 +29,7 @@ r3.remove();
 // --- Record key preservation (HookEvent-like) ---
 type MyEvent = 'A' | 'B' | 'C';
 type Base4 = { events?: Partial<Record<MyEvent, number[]>> };
-type R4 = Refine<Base4, { events: Record<string, string[]> }>;
+type R4 = Refine<Base4, { events: Record<string, Override<string[]>> }>;
 const r4 = {} as R4;
 r4.events!.A = ['ok']; // ok
 // @ts-expect-error — "X" is not a valid event key
@@ -70,7 +70,7 @@ type EventKey = 'click' | 'hover' | 'scroll';
 type Base8 = {
   handlers?: Partial<Record<EventKey, ((...args: any[]) => void)[]>>;
 };
-type R8 = Refine<Base8, { handlers: Record<string, string[]> }>;
+type R8 = Refine<Base8, { handlers: Record<string, Override<string[]>> }>;
 const r8 = {} as R8;
 r8.handlers!.click = ['handler1']; // ok — replaced with strings
 // @ts-expect-error — functions no longer accepted
@@ -244,7 +244,7 @@ r25.items[1].z; // ok — second element is type 'c'
 type Callback = (x: string) => void;
 type Matcher = { hooks: Callback[]; timeout?: number };
 type Base26 = { matchers: Matcher[] };
-type R26 = Refine<Base26, { matchers: Array<{ hooks: string[] }> }>;
+type R26 = Refine<Base26, { matchers: Array<{ hooks: Override<string[]> }> }>;
 const r26 = {} as R26;
 r26.matchers[0].hooks[0].toUpperCase(); // ok — hooks replaced with string[]
 r26.matchers[0].timeout; // ok — unmentioned fields preserved
@@ -256,3 +256,99 @@ r27[0].x; // ok — first element is type 'a'
 r27[1].y; // ok — second element is type 'b'
 // @ts-expect-error — tuple has length 2
 r27[2];
+
+// --- Conformance: a constraint value must narrow the base unless wrapped in Override ---
+type CbMatcher = { hooks: ((x: string) => void)[]; timeout?: number };
+type OvBase = { matchers: CbMatcher[] };
+
+// @ts-expect-error — string[] is not a narrowing of ((x: string) => void)[]
+type _OvBad = Refine<OvBase, { matchers: Array<{ hooks: string[] }> }>;
+
+// Override at the leaf bypasses conformance and replaces just that field
+type OvLeaf = Refine<OvBase, { matchers: Array<{ hooks: Override<string[]> }> }>;
+const ovLeaf = {} as OvLeaf;
+ovLeaf.matchers[0].hooks[0].toUpperCase(); // ok — hooks replaced with string[]
+ovLeaf.matchers[0].timeout; // ok — sibling field preserved
+
+// Override wrapping a whole object replaces it outright (siblings dropped)
+type OvObj = Refine<OvBase, { matchers: Array<Override<{ hooks: string[] }>> }>;
+const ovObj = {} as OvObj;
+ovObj.matchers[0].hooks[0].toUpperCase(); // ok
+// @ts-expect-error — timeout dropped: the whole object was replaced
+ovObj.matchers[0].timeout;
+
+// --- Primitive leaf: a non-narrowing replacement needs Override ---
+type LitBase = { a: string; n: number };
+// @ts-expect-error — number is not a narrowing of string
+type _LitBad = Refine<LitBase, { a: 42 }>;
+type LitOk = Refine<LitBase, { a: 'x' }>; // narrowing is still fine without Override
+type _litOk = Assert<Eq<LitOk['a'], 'x'>>;
+type LitOverride = Refine<LitBase, { a: Override<42> }>;
+const litOv = {} as LitOverride;
+const litOvA: 42 = litOv.a; // ok — replaced with 42
+
+// --- Conformance is enforced at every nesting layer; Override works at any depth ---
+type DeepBase = { outer: { inner: { fn: () => void; keep: string } } };
+// @ts-expect-error — string is not a narrowing of () => void
+type _DeepBad = Refine<DeepBase, { outer: { inner: { fn: string } } }>;
+type DeepOk = Refine<DeepBase, { outer: { inner: { fn: Override<string> } } }>;
+const deepOk = {} as DeepOk;
+deepOk.outer.inner.fn.toUpperCase(); // ok — fn replaced with string
+deepOk.outer.inner.keep.toUpperCase(); // ok — sibling preserved
+
+// Override as the entire constraint replaces the whole base type
+type WholeBase = { a: string; b: number };
+type WholeOv = Refine<WholeBase, Override<{ id: string }>>;
+type _wholeOv = Assert<Eq<WholeOv, { id: string }>>;
+
+// --- Loose: skip conformance but keep merging with the base (unlike Override) ---
+// (CbMatcher = { hooks: ((x: string) => void)[]; timeout?: number }, OvBase from above)
+
+// Object-level Loose: hooks replaced, sibling `timeout` preserved
+type LooseObj = Refine<OvBase, { matchers: Array<Loose<{ hooks: string[] }>> }>;
+const looseObj = {} as LooseObj;
+looseObj.matchers[0].hooks[0].toUpperCase(); // ok — hooks replaced with string[]
+looseObj.matchers[0].timeout; // ok — sibling preserved (Override would drop it)
+
+// Same input under Override drops the sibling — the key Loose-vs-Override contrast
+type LooseVsOverride = Refine<OvBase, { matchers: Array<Override<{ hooks: string[] }>> }>;
+const lvo = {} as LooseVsOverride;
+// @ts-expect-error — timeout dropped: Override replaced the whole object
+lvo.matchers[0].timeout;
+
+// Loose skips conformance where a bare value would be rejected...
+type CfgBase = { config: { name: string; cmd: () => void } };
+// @ts-expect-error — replacing () => void with string is not a narrowing
+type _CfgBad = Refine<CfgBase, { config: { cmd: string } }>;
+// ...and still merges: cmd replaced, sibling `name` preserved
+type CfgLoose = Refine<CfgBase, { config: Loose<{ cmd: string }> }>;
+const cfgLoose = {} as CfgLoose;
+cfgLoose.config.cmd.toUpperCase(); // ok — cmd replaced with string
+cfgLoose.config.name.toUpperCase(); // ok — sibling preserved
+
+// Top-level Loose merges into the whole base (Override would replace it)
+type WholeLoose = Refine<{ a: string; b: number }, Loose<{ a: 'x' }>>;
+type _wholeLooseA = Assert<Eq<WholeLoose['a'], 'x'>>; // narrowed
+type _wholeLooseB = Assert<Eq<WholeLoose['b'], number>>; // sibling preserved
+
+// --- Loose also adds keys the base doesn't have ---
+type AddBase = { a: string; b: number };
+type Added = Refine<AddBase, Loose<{ a: 'x'; c: boolean }>>;
+type _addedA = Assert<Eq<Added['a'], 'x'>>; // shared key narrowed
+type _addedB = Assert<Eq<Added['b'], number>>; // sibling preserved
+type _addedC = Assert<Eq<Added['c'], boolean>>; // new key added
+
+// Deep — a new key nested inside the Loose payload is added without re-wrapping
+type DeepAddBase = { outer: { x: number } };
+type DeepAdded = Refine<DeepAddBase, Loose<{ outer: { x: 1; y: string } }>>;
+type _deepX = Assert<Eq<DeepAdded['outer']['x'], 1>>; // narrowed
+type _deepY = Assert<Eq<DeepAdded['outer']['y'], string>>; // new nested key added
+
+// An added optional key stays optional
+type OptAdded = Refine<AddBase, Loose<{ d?: boolean }>>;
+type _optD = Assert<Eq<OptAdded['d'], boolean | undefined>>;
+
+// Leaf `Override` only replaces — it never adds keys (that's Loose's job)
+type NotAdded = Refine<AddBase, { a: Override<42> }>;
+// @ts-expect-error — 'c' was never added
+type _notAddedC = NotAdded['c'];
